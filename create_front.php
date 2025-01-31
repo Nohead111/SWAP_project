@@ -22,7 +22,7 @@ if (empty($_SESSION['csrf_token'])) {
 $servername = "localhost";
 $username = "root";
 $password = "";
-$dbname = "swap_project";
+$dbname = "amc_data";
 
 // Create a connection to the MySQL database
 $conn = new mysqli($servername, $username, $password, $dbname);
