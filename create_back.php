@@ -16,7 +16,7 @@ if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_tok
 $servername = "localhost";  // MySQL server (localhost for XAMPP)
 $username = "root";         // MySQL default username in XAMPP is 'root'
 $password = "";             // Default password is empty for XAMPP
-$dbname = "swap_project";  // Your database name
+$dbname = "amc_data";  // Your database name
 
 // Create a connection to the MySQL database
 $conn = new mysqli($servername, $username, $password, $dbname);
