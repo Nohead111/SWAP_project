@@ -1,0 +1,28 @@
+program structure
+    index.html
+        dashboard.php
+
+
+        projects.php
+
+
+
+        researchers.php
+
+
+
+        equipment_inventory.php         done
+
+            add_equipment.html          done
+                add_equipment_do.php    done
+
+            edit_equipment.php          done
+            
+
+
+            delete_equipment.php        done
+
+
+
+
+folder 
