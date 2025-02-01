@@ -289,7 +289,7 @@ while ($row = $result->fetch_assoc()) {
             <ul id="selected-users-list"></ul>
         </div>
 
-        <!-- CSRF Token -->
+        <!-- CSRF Token --> 
         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
         <input type="hidden" name="assigned_team" id="assigned_team">
 
