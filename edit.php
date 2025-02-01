@@ -1,5 +1,6 @@
 <?php 
     //include "../config/config.php";
+    include '../app/function.php';
     include "../app/edit.php";
 ?>
 
@@ -26,20 +27,19 @@
                 <input type="number" id="uid" name="uid" autocomplete="off" value="<?php echo htmlspecialchars($researcher['UserID']); ?>" required>
 
                 <label for="name">Full Name:</label>
-                <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($researcher['FullName']); ?>" required>
+                <input type="text" id="name" name="name" autocomplete="off" value="<?php echo htmlspecialchars($researcher['FullName']); ?>" required>
 
                 <label for="email">Email:</label>
-                <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($researcher['Email']); ?>" required>
+                <input type="email" id="email" name="email" autocomplete="off" value="<?php echo htmlspecialchars($researcher['Email']); ?>" required>
 
                 <label for="phoneNum">Phone Number:</label>
-                <input type="text" id="phoneNum" name="phoneNum" value="<?php echo htmlspecialchars($researcher['PhoneNumber']); ?>" required>
+                <input type="text" id="phoneNum" name="phoneNum" autocomplete="off" value="<?php echo htmlspecialchars($researcher['PhoneNumber']); ?>" required>
 
                 <label for="department">Department:</label>
-                <input type="text" id="department" name="department" value="<?php echo htmlspecialchars($researcher['Department']); ?>" required>
+                <input type="text" id="department" name="department" autocomplete="off" value="<?php echo htmlspecialchars($researcher['Department']); ?>" required>
 
                 <label for="specialization">Specialization:</label>
-                <input type="text" id="specialization" name="specialization" value="<?php echo htmlspecialchars($researcher['Specialization']); ?>" required>
-
+                <input type="text" id="specialization" name="specialization" autocomplete="off" value="<?php echo htmlspecialchars($researcher['Specialization']); ?>" required>
                 <button type="submit">Update Researcher</button>
             </form>
         </section>

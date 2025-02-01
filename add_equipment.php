@@ -1,5 +1,11 @@
 <?php
 require "config.php"; // Database connection
+session_start();
+if (!isset($_SESSION["user_id"])) {
+    header("Location: login.php");
+    exit();
+}
+$createdBy = $_SESSION['user_name'];
 
 // Check if form is submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -65,11 +71,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->close();
 
     // Insert into database using prepared statement
-    $insertQuery = "INSERT INTO equipment (Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate) 
-                    VALUES (?, ?, ?, ?, ?, ?)";
+    $insertQuery = "INSERT INTO equipment (Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate, CreatedBy) 
+                    VALUES (?, ?, ?, ?, ?, ?,?)";
     
     $stmt = $con->prepare($insertQuery);
-    $stmt->bind_param("ssssss", $name, $description, $serialNumber, $status, $purchaseDate, $lastServicedDate);
+    $stmt->bind_param("sssssss", $name, $description, $serialNumber, $status, $purchaseDate, $lastServicedDate, $createdBy);
 
     if ($stmt->execute()) {
         echo "<script>alert('Equipment added successfully!'); window.location.href='equipment_inventory.php';</script>";

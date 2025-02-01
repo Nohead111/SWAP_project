@@ -1,6 +1,7 @@
 <?php
-//include "../config/session_security.php";
-include "../config/config.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if(isset($_POST["insert"]) && $_POST["insert"] == "yes") {
         //Get user input
@@ -11,54 +12,50 @@ if(isset($_POST["insert"]) && $_POST["insert"] == "yes") {
         $department = trim($_POST["department"]);
         $specialization = trim($_POST["specialization"]);
 
-        // Ensure UID is a number
-        if (!is_numeric($uid)){
-            $_SESSION['error'] = "UserID must be a number:";
-            header("Location: index.php");
-            exit();
+        // Ensure UID is numeric and greater than 0
+        if (!ctype_digit($uid) || $uid <=0) {
+            set_session_message('error', 'Invalid User ID', $redirect = "index.php");
         }
 
+        // Check if User existed in `users` table   
+        if (check_record_count($connect, 'UserID', 'users', 'i', $uid) == 0) {
+            // User ID does not exist
+            set_session_message('error', 'Error: User ID not found in the database', $redirect = "index.php");
+        } 
+        
         //Check for unique uid
-        $stmt = $connect->prepare("SELECT UserID FROM researchers WHERE UserID=?");
-        $stmt->bind_param("i", $uid);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result->num_rows > 0) {
-            echo "<p>This email is UserID is used. Try another one!</p>";
-            echo "<a href='javascript:history.back()'><button>Go Back</button></a>";
-            exit();
-        }
+        if (check_record_count($connect, 'UserID', 'researchers', 'i', $uid) > 0) {
+            // User ID is already in use
+            set_session_message('error', 'This User ID is already in use.', $redirect = "index.php");
+        } 
 
         //Validate email format
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            echo "<p>Invalid email format!</p>";
-            echo "<a href='javascript:history.back()'><button>Go Back</button></a>";
-            exit();
+            set_session_message('error', 'Invalid email format!', $redirect = "index.php");
         } 
         //Check for unique email
-        $stmt = $connect->prepare("SELECT Email FROM researchers WHERE Email=?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result->num_rows > 0) {
-            echo "<p>This email is already used. Try another one!</p>";
-            echo "<a href='javascript:history.back()'><button>Go Back</button></a>";
-            exit();
+        if (check_record_count($connect, 'Email', 'researchers', 's', $email) > 0) {
+            set_session_message('error', 'This email is already in use.', $redirect = "index.php");
         }
         
+        // Validate phone number: allow only digits, spaces, dashes, parentheses, and plus sign
+        if (!preg_match('/^\+?[0-9\s\-\(\)]{6,20}$/', $phoneNum)) {
+            set_session_message('error', 'Invalid phone number format!', $redirect = "index.php");
+        }
 
         //prepare SQL Query   
         $query=$connect->prepare("insert into researchers (UserID, FullName, Email, PhoneNumber, Department, Specialization) values (?, ?, ?, ?, ?, ?);");
         
         // Bind parameters
-        $query->bind_param('ississ', $uid, $name, $email, $phoneNum, $department, $specialization);
+        $query->bind_param('isssss', $uid, $name, $email, $phoneNum, $department, $specialization);
         
         //Execute SQL Query
         if($query->execute())
         {
-            echo "<center>Record Inserted!</center><br>";
+            set_session_message('success', 'Record Inserted!', $redirect = "index.php");
+        } else {
+            error_log("Database error: " . $connect->error); // Log the error
+            set_session_message('error', 'An error occurred. Please try again later', $redirect = "index.php");
         }
     }
 ?>
