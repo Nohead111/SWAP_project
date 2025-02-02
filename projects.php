@@ -1,5 +1,31 @@
 <?php
-session_start();
+session_set_cookie_params([
+    'httponly' => true, // Prevent JavaScript access to session cookies
+    'secure' => true,   // Ensures cookies are only sent over HTTPS
+    'samesite' => 'Strict' // Protects against CSRF attacks
+]);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Regenerate session ID after login (Prevents fixation attacks)
+if (!isset($_SESSION['INITIATED'])) {
+    session_regenerate_id(true);
+    $_SESSION['INITIATED'] = true;
+}
+
+// Bind session to IP address & User-Agent (Prevents session hijacking)
+if (!isset($_SESSION['IP_ADDRESS'])) {
+    $_SESSION['IP_ADDRESS'] = $_SERVER['REMOTE_ADDR'];
+    $_SESSION['USER_AGENT'] = $_SERVER['HTTP_USER_AGENT'];
+} elseif ($_SESSION['IP_ADDRESS'] !== $_SERVER['REMOTE_ADDR'] || $_SESSION['USER_AGENT'] !== $_SERVER['HTTP_USER_AGENT']) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
 require "config.php";
 // Set a timeout duration
 $session_timeout = 300; // 5 minutes
@@ -93,13 +119,12 @@ if ($_SESSION['user_role'] == 1 || $_SESSION['user_role'] == 2) {
 
 // Handle AJAX user search
 if (isset($_GET['q'])) {
-    $search_query = $con->real_escape_string($_GET['q']);
-    $search_results = [];
-
+    $search_query = $_GET['q'] ?? '';
     $query = $con->prepare("SELECT UserID, Username FROM Users WHERE Username LIKE CONCAT('%', ?, '%') ORDER BY UserID ASC");
     $query->bind_param("s", $search_query);
     $query->execute();
     $result = $query->get_result();
+    
 
     while ($row = $result->fetch_assoc()) {
         $search_results[] = $row;
@@ -113,6 +138,9 @@ if (isset($_POST['create_project'])) {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die("CSRF token validation failed.");
     }
+    
+    // Regenerate CSRF token after form submission
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));    
 
     $title = $con->real_escape_string($_POST['title']);
     $description = $con->real_escape_string($_POST['description']);
@@ -254,9 +282,10 @@ if (isset($_POST['delete_project']) && isset($_POST['csrf_token'])) {
                 </tr>
                 <?php foreach ($projects as $row): ?>
                     <tr>
-                        <td><?= htmlspecialchars($row['ProjectName']) ?></td>
-                        <td><?= htmlspecialchars($row['Description']) ?></td>
-                        <td><?= htmlspecialchars($row['StartDate']) ?></td>
+                        <td><?= htmlspecialchars($row['ProjectName'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= htmlspecialchars($row['Description'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= htmlspecialchars($row['StartDate'], ENT_QUOTES, 'UTF-8') ?></td>
+
                         <td><?= htmlspecialchars($row['EndDate']) ?></td>
                         <td><?= htmlspecialchars($row['Status']) ?></td>
                         <td><?= htmlspecialchars($row['ProjectFunding']) ?></td>
