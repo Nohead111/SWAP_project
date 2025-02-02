@@ -1,11 +1,24 @@
 <?php
+session_start();
+if (!isset($_SESSION["user_id"])) {
+    header("Location: login.php");
+    exit();
+}
+$createdBy = $_SESSION['user_name'];
+
+$user_role = $_SESSION["user_role"]; // Get logged-in user's role
+
 
 $result = get_equipment();
 
 function get_equipment(){
 
+
     require "config.php";
-	
+    $createdBy = $_SESSION['user_name'];
+
+    $user_role = $_SESSION["user_role"]; // Get logged-in user's role
+
 	function printerror($message, $con) {
 		//echo "<pre>";
 		//echo "$message<br>";
@@ -39,8 +52,15 @@ function get_equipment(){
 	}
 	else printok("Selecting $db_database");
 
+    $query="SELECT EquipmentID, Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate , CreatedBy FROM equipment";
+    if ($user_role == 3) {
+	    $query="SELECT EquipmentID, Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate , CreatedBy FROM equipment 
+        WHERE CreatedBy = '$createdBy'";
+        //echo "$query<br>";
+    } else {
+        $query="SELECT EquipmentID, Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate , CreatedBy FROM equipment";
+    }
 
-	$query="SELECT EquipmentID, Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate FROM equipment";
 	$result=mysqli_query($con,$query);
 	if (!$result) {
 		printerror("Selecting $db_database",$con);
@@ -86,7 +106,10 @@ function get_equipment(){
         <!-- Add Equipment Button -->
         <section id="inventory-header">
             <h2>Equipment List</h2>
-            <a href="add_equipment.php" class="button">Add Equipment</a>
+            <?php if ($user_role == 1 || $user_role == 3) { ?> 
+                <a href="add_equipment.php" class="button">Add Equipment</a>
+            <?php } ?>
+           
         </section>
 
         <!-- Equipment Table -->
@@ -101,7 +124,9 @@ function get_equipment(){
                         <th>Status</th>
                         <th>PurchaseDate</th>
                         <th>LastServicedDate</th>
+                        <th>CreatedBy</th>
                         <th>Actions</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -116,11 +141,18 @@ function get_equipment(){
                                 <td>{$row['Status']}</td>
                                 <td>{$row['PurchaseDate']}</td>
                                 <td>{$row['LastServicedDate']}</td>
-                                <td>
-                                    <a href='edit_equipment.php?id={$row['EquipmentID']}' class='button'>Edit</a>
-                                    <a href='#' class='button delete-button' onclick='confirmDelete({$row['EquipmentID']})'>Delete</a>
-                                </td>
-                            </tr>";
+                                <td>{$row['CreatedBy']}</td>
+                                <td>";
+                                if ($user_role == 1 || $user_role == 3 ) { // Only Admins see Edit button
+                                    echo "<a href='edit_equipment.php?id={$row['EquipmentID']}' class='button'>Edit</a>";
+                                    if ($user_role == 1 ) { // Only Admins see Edit button                           
+                                        echo "<a href='#' class='button delete-button' onclick='confirmDelete({$row['EquipmentID']})'>Delete</a>";
+                                    }
+                                  
+                                }
+                                
+                                
+                                echo "</td></tr>";
                         }
                     } else {
                         echo "<tr><td colspan='8'>No equipment found.</td></tr>";

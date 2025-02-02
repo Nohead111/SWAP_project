@@ -69,7 +69,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Redirect user based on role
                 if ($user["RoleID"] == 1) {
-                    header("Location: admin_dashboard.php");
+                    header("Location: equipment_inventory.php");
                 } else {
                     header("Location: equipment_inventory.php");
                 }
