@@ -8,8 +8,15 @@ if (isset($_SESSION["user_id"])) {
     exit();
 }
 
+
 // Handle login form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        echo "<script>alert('CSRF validation failed!'); window.history.back();</script>";
+        exit();
+    }
+
     $email = trim($_POST["email"]);
     $password = trim($_POST["password"]);
 
@@ -85,7 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $con->close();
     }
 }
-
+$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
 ?>
 
@@ -110,6 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <?php if (isset($error)) echo "<p class='error'>$error</p>"; ?>
 
             <form action="login.php" method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                 <label for="email">Email:</label>
                 <input type="email" id="email" name="email" required>
 

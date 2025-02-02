@@ -12,6 +12,7 @@ $session_timeout = 300; // 5 minutes
     }
     $_SESSION['LAST_ACTIVITY'] = time();
 $role = $_SESSION['user_role']; // Get the user's role
+$user_id = $_SESSION['user_id'];
 
 require "config.php";
 require "function.php";
@@ -149,39 +150,17 @@ if(isset($_POST["delete_button"])){
 
     <!-- Main Content -->
     <main>
-        <!-- Form Section -->
-        <section id="add-researcher">
-            <h2>Add New Researcher</h2>
-            <form action="researcher_profile.php" method="POST">
-                <label for="uid">User ID:</label>
-                <input type="number" id="uid" name="uid" autocomplete="off" value="<?php echo get_sanitized_input('uid'); ?>" required>
-
-                <label for="name">Full Name:</label>
-                <input type="text" id="name" name="name" autocomplete="off" value="<?php echo get_sanitized_input('name'); ?>" required>
-
-                <label for="email">Email:</label>
-                <input type="text" id="email" name="email" autocomplete="off" value="<?php echo get_sanitized_input('email'); ?>" required>
-
-                <label for="phoneNum">Phone Number:</label>
-                <input type="text" id="phoneNum" name="phoneNum" autocomplete="off" value="<?php echo get_sanitized_input('phoneNum'); ?>" required>
-
-                <label for="department">Department:</label>
-                <input type="text" id="department" name="department" autocomplete="off" value="<?php echo get_sanitized_input('department'); ?>" required>
-
-                <label for="specialization">Specialization:</label>
-                <input type="text" id="specialization" name="specialization" autocomplete="off" value="<?php echo get_sanitized_input('specialization'); ?>" required>
-
-                <input type="hidden" name="id" value="<?php echo get_sanitized_input('id'); ?>">
-                <input type="hidden" name="insert" value="yes">
-                <button type="submit" name="insert_button">Add Researcher</button>
-            </form>
-            
-        </section>
-        <!-- Table Section -->
-        <section id="Researchers">
-            <h2>Researchers</h2>
+    <!-- Table Section -->
+    <section id="Researchers">
+            <h2>Profile</h2>
             <?php
-            $query=$con->prepare("select * from researchers");
+            if ($role === 1 or $role === 2){
+                $query=$con->prepare("select * from researchers");
+            } elseif ($role === 3) {
+                $query=$con->prepare("select * from researchers where UserID = ?");
+                $query->bind_param("i", $user_id);
+            }
+
             $query->execute();
             $query->bind_result($id, $uid, $name, $email, $phoneNum, $department, $specialization);
             
@@ -208,13 +187,19 @@ if(isset($_POST["delete_button"])){
                         <td>".sanitize_output($phoneNum)."</td>
                         <td>".sanitize_output($department)."</td>
                         <td>".sanitize_output($specialization)."</td>
-                        <td>
-                        <form method='GET' action='edit_researcher.php'>
-                            <input type='hidden' name='id' value=".$id." />
-                            <input type='submit' name='edit_button' value='Edit' class='button' />
-                        </form>
-                    </td>
-                    <td>";
+
+                        <td>";
+                        if ($role === 1 or $role === 2) {
+                            echo "<form method='GET' action='edit_researcher.php'>
+                                <input type='hidden' name='id' value=".$id." />
+                                <input type='submit' name='edit_button' value='Edit' class='button' />
+                            </form>";
+                    
+                        } else {
+                            echo "Not Allowed";
+                        } 
+                        echo "</td>
+                        <td>";
                         if ($role === 1) {
                             echo "<form method='POST' action='researcher_profile.php'>
                                 <input type='hidden' name='id' value=".$id." />
@@ -230,6 +215,37 @@ if(isset($_POST["delete_button"])){
             echo "</table>";
             ?>
             </section>
+        <!-- Form Section -->
+        <?php if ($role !== 3): ?>
+        <section id="add-researcher">
+            <h2>Add New Researcher</h2>
+            <form action="researcher_profile.php" method="POST">
+                <label for="uid">User ID:</label>
+                <input type="number" id="uid" name="uid" autocomplete="off" value="<?php echo get_sanitized_input('uid'); ?>" required>
+
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" autocomplete="off" value="<?php echo get_sanitized_input('name'); ?>" required>
+
+                <label for="email">Email:</label>
+                <input type="text" id="email" name="email" autocomplete="off" value="<?php echo get_sanitized_input('email'); ?>" required>
+
+                <label for="phoneNum">Phone Number:</label>
+                <input type="text" id="phoneNum" name="phoneNum" autocomplete="off" value="<?php echo get_sanitized_input('phoneNum'); ?>" required>
+
+                <label for="department">Department:</label>
+                <input type="text" id="department" name="department" autocomplete="off" value="<?php echo get_sanitized_input('department'); ?>" required>
+
+                <label for="specialization">Specialization:</label>
+                <input type="text" id="specialization" name="specialization" autocomplete="off" value="<?php echo get_sanitized_input('specialization'); ?>" required>
+
+                <input type="hidden" name="id" value="<?php echo get_sanitized_input('id'); ?>">
+                <input type="hidden" name="insert" value="yes">
+                <button type="submit" name="insert_button">Add Researcher</button>
+                <br></br>
+            </form>
+        <?php endif; ?>    
+        </section>
+        
     </main>
 
     <!-- Footer -->

@@ -1,5 +1,31 @@
 <?php
-session_start();
+session_set_cookie_params([
+    'httponly' => true, // Prevent JavaScript access to session cookies
+    'secure' => true,   // Ensures cookies are only sent over HTTPS
+    'samesite' => 'Strict' // Protects against CSRF attacks
+]);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Regenerate session ID after login (Prevents fixation attacks)
+if (!isset($_SESSION['INITIATED'])) {
+    session_regenerate_id(true);
+    $_SESSION['INITIATED'] = true;
+}
+
+// Bind session to IP address & User-Agent (Prevents session hijacking)
+if (!isset($_SESSION['IP_ADDRESS'])) {
+    $_SESSION['IP_ADDRESS'] = $_SERVER['REMOTE_ADDR'];
+    $_SESSION['USER_AGENT'] = $_SERVER['HTTP_USER_AGENT'];
+} elseif ($_SESSION['IP_ADDRESS'] !== $_SERVER['REMOTE_ADDR'] || $_SESSION['USER_AGENT'] !== $_SERVER['HTTP_USER_AGENT']) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
 require "config.php"; // Include database connection
 
 //  Redirect if not logged in

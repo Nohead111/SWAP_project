@@ -1,6 +1,33 @@
 <?php
 require "config.php"; // Database connection
-session_start();
+
+session_set_cookie_params([
+    'httponly' => true, // Prevent JavaScript access to session cookies
+    'secure' => true,   // Ensures cookies are only sent over HTTPS
+    'samesite' => 'Strict' // Protects against CSRF attacks
+]);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Regenerate session ID after login (Prevents fixation attacks)
+if (!isset($_SESSION['INITIATED'])) {
+    session_regenerate_id(true);
+    $_SESSION['INITIATED'] = true;
+}
+
+// Bind session to IP address & User-Agent (Prevents session hijacking)
+if (!isset($_SESSION['IP_ADDRESS'])) {
+    $_SESSION['IP_ADDRESS'] = $_SERVER['REMOTE_ADDR'];
+    $_SESSION['USER_AGENT'] = $_SERVER['HTTP_USER_AGENT'];
+} elseif ($_SESSION['IP_ADDRESS'] !== $_SERVER['REMOTE_ADDR'] || $_SESSION['USER_AGENT'] !== $_SERVER['HTTP_USER_AGENT']) {
+    session_unset();
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
 if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit();
@@ -25,7 +52,13 @@ $createdBy = $_SESSION['user_name'];
 
 // Check if form is submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
+
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        //echo "<script>alert('CSRF validation failed!'); window.history.back();</script>";
+        //exit();
+    }
+
+
     // Retrieve and sanitize input values
     $name = htmlspecialchars(trim($_POST['name']));
     $description = htmlspecialchars(trim($_POST['description']));
@@ -129,10 +162,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
    <!-- Navigation -->
    <nav>
-    <a href="index.html">Dashboard</a>
-    <a href="projects.html">Projects</a>
-    <a href="researchers.html">Researchers</a>
-    <a href="equipment_inventory.php" class="active">Equipment Inventory</a> <!-- Updated hyperlink -->
+    <a href="dashboard.php">Dashboard</a>
+        <a href="projects.php">Projects</a>
+        <a href="researcher_profile.php">Researchers</a>
+        <a href="equipment_inventory.php" class="active">Equipment Inventory</a>
+        
 </nav>
     <!-- Main Content -->
     <main>
@@ -140,6 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <section id="add-equipment">
             <h2>Add New Equipment</h2>
             <form action="add_equipment.php" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                 <label for="name">Equipment Name:</label>
                 <input type="text" id="name" name="name" required>
 
