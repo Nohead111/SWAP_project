@@ -54,6 +54,11 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role'])) {
+    header("Location: login.php"); // Redirect to login if not logged in
+    exit();
+}
+
 // Fetch project details before displaying the form
 $project = [];
 $assigned_team = [];
