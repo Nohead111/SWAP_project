@@ -2,6 +2,15 @@
 session_start();
 // Set a timeout duration
 $session_timeout = 300; // 5 minutes
+// Generate a CSRF token if it doesn't exist
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    // Redirect to login if the user is not logged in
+    if (!isset($_SESSION['user_id'])) {
+        header("Location: login.php"); 
+        exit();
+    }
 
 // Check if the session has timed out
     if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
@@ -59,6 +68,13 @@ if (!$result) {
     die();
 }
 else printok("Selecting $db_database");
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("CSRF validation failed.");
+    }
+}
+
 if(isset($_POST["insert_button"]) ) {
     //Get user input
     $uid = trim($_POST["uid"]);
@@ -73,18 +89,12 @@ if(isset($_POST["insert_button"]) ) {
         set_session_message('error', 'Invalid User ID', $redirect = "researcher_profile.php");
     }
 
-    // Check if User existed in `users` table   
+    // Check if User existed in users table   
     if (check_record_count($con, 'UserID', 'users', 'i', $uid) == 0) {
         // User ID does not exist
         set_session_message('error', 'Error: User ID not found in the database', $redirect = "researcher_profile.php");
     } 
     
-    //Check for unique uid
-    if (check_record_count($con, 'UserID', 'researchers', 'i', $uid) > 0) {
-        // User ID is already in use
-        set_session_message('error', 'This User ID is already in use.', $redirect = "researcher_profile.php");
-    } 
-
     //Validate email format
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         set_session_message('error', 'Invalid email format!', $redirect = "researcher_profile.php");
@@ -114,6 +124,7 @@ if(isset($_POST["insert_button"]) ) {
         set_session_message('error', 'An error occurred. Please try again later', $redirect = "researcher_profile.php");
     }
 }
+
 if(isset($_POST["delete_button"])){
     $id=$_POST["id"];
     $query=$con->prepare("DELETE FROM researchers WHERE ResearcherID =?");
@@ -122,7 +133,10 @@ if(isset($_POST["delete_button"])){
     {
         set_session_message('success', 'Record Deleted', $redirect = "researcher_profile.php");
     }
+    // Regenerate CSRF token to prevent reuse
+    $_SESSION['crsf_token'] = bin2hex(random_bytes(32));
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -202,6 +216,7 @@ if(isset($_POST["delete_button"])){
                         <td>";
                         if ($role === 1) {
                             echo "<form method='POST' action='researcher_profile.php'>
+                                <input type='hidden' name='csrf_token' value=".$_SESSION['csrf_token'].">
                                 <input type='hidden' name='id' value=".$id." />
                                 <input type='submit' name='delete_button' value='Delete' class='button' />
                             </form>";
@@ -220,6 +235,8 @@ if(isset($_POST["delete_button"])){
         <section id="add-researcher">
             <h2>Add New Researcher</h2>
             <form action="researcher_profile.php" method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+
                 <label for="uid">User ID:</label>
                 <input type="number" id="uid" name="uid" autocomplete="off" value="<?php echo get_sanitized_input('uid'); ?>" required>
 

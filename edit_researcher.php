@@ -1,8 +1,19 @@
+
 <?php
 session_start();
 // Set a timeout duration
 $session_timeout = 300; // 5 minutes
 
+// Generate a CSRF token if it doesn't exist
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Redirect to login if the user is not logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php"); 
+    exit();
+}
 // Check if the session has timed out
     if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
         session_unset();
@@ -61,6 +72,10 @@ else printok("Selecting $db_database");
 
 // Check if the form is submitted using POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit') {
+    // CSRF Validation: Ensure the request is legitimate
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("CSRF validation failed.");
+    }
     // Retrieve and sanitize input data
     $id = trim($_POST['id']);
     $uid = trim($_POST['uid']);
@@ -75,20 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         set_session_message('error', 'Invalid User ID', $redirect = "researcher_profile.php");
     }
 
-    // Check if User exists in `users` table
+    // Check if User exists in users table
     if (check_record_count($connect, 'UserID', 'users', 'i', $uid) == 0) {
         set_session_message('error', 'Error: User ID not found in the database.', $redirect = "researcher_profile.php");
-    }
-
-    // Check for unique UID in `researchers` table, excluding the current record
-    if (check_record_count($connect, 'UserID', 'researchers', 'i', $uid) > 0) {
-        $stmt = $connect->prepare("SELECT ResearcherID FROM researchers WHERE UserID = ? AND ResearcherID != ?");
-        $stmt->bind_param('ii', $uid, $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows > 0) {
-            set_session_message('error', 'This User ID is already in use.', $redirect = "researcher_profile.php");
-        }
     }
 
     // Validate email format
@@ -96,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         set_session_message('error', 'Invalid email format!', $redirect = "researcher_profile.php");
     }
 
-    // Check for unique email in `researchers` table, excluding the current record
+    // Check for unique email in researchers table, excluding the current record
     if (check_record_count($connect, 'Email', 'researchers', 's', $email) > 0) {
         $stmt = $connect->prepare("SELECT ResearcherID FROM researchers WHERE Email = ? AND ResearcherID != ?");
         $stmt->bind_param('si', $email, $id);
@@ -122,6 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         error_log("Database error: " . $connect->error); // Log the error
         set_session_message('error', 'An error occurred. Please try again later', $redirect = "researcher_profile.php");
     }
+    // Regenerate CSRF Token After Every Form Submission
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
 } else {
     // Check if an ID is provided via GET
@@ -163,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <main>
         <section id="edit-researcher">
             <form method="POST" action="edit_researcher.php">
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                 <input type="hidden" name="action" value="edit">
                 <input type="hidden" name="id" value="<?php echo $researcher['ResearcherID']; ?>">
 

@@ -54,8 +54,8 @@ $createdBy = $_SESSION['user_name'];
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        //echo "<script>alert('CSRF validation failed!'); window.history.back();</script>";
-        //exit();
+        echo "<script>alert('CSRF validation failed!'); window.history.back();</script>";
+        exit();
     }
 
 
