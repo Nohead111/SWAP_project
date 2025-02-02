@@ -6,6 +6,16 @@ if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit();
 }
+$session_timeout = 300; // 5 minutes
+
+// Check if the session has timed out
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+        exit();
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
 
 // ✅ Get user details
 $user_name = $_SESSION['user_name'];
@@ -29,7 +39,7 @@ $roleName = ($user_role == 1) ? "Admin" : (($user_role == 3) ? "Research Assista
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Equipment Inventory</title>
+    <title>Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -45,6 +55,7 @@ $roleName = ($user_role == 1) ? "Admin" : (($user_role == 3) ? "Research Assista
         <a href="projects.php">Projects</a>
         <a href="researcher_profile.php">Researchers</a>
         <a href="equipment_inventory.php" class="active">Equipment Inventory</a>
+        <a href="update_password.php">Change Password</a>
     </nav>
 
     <!-- Dashboard Content -->
