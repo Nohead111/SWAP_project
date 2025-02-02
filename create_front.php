@@ -46,10 +46,32 @@ while ($row = $user_query->fetch_assoc()) {
 
 // Fetch existing projects
 $projects = [];
-$project_query = $conn->query("SELECT * FROM Projects ORDER BY StartDate DESC");
-while ($row = $project_query->fetch_assoc()) {
-    $projects[] = $row;
+if ($_SESSION['role'] === 'Admin') {
+    $result = $conn->query("SELECT * FROM Projects ORDER BY StartDate DESC");
+    while ($row = $result->fetch_assoc()) {
+        $projects[] = $row;
+    }
+} else if ($_SESSION['role'] === 'Research Assistant') {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT p.* FROM Projects p JOIN Researcher_Project rp ON p.ProjectID = rp.ProjectID WHERE rp.ResearcherID = ? ORDER BY p.StartDate DESC");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $projects[] = $row;
+    }
+} else if ($_SESSION['role'] === 'Researcher') {
+    $user_id = $_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT * FROM Projects WHERE CreatedBy = ? ORDER BY StartDate DESC");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $projects[] = $row;
+    }
 }
+
+
 
 // Handle AJAX user search
 if (isset($_GET['q'])) {
@@ -210,13 +232,15 @@ if (isset($_POST['delete_project']) && isset($_POST['csrf_token'])) {
                         <td><?= htmlspecialchars($row['Status']) ?></td>
                         <td><?= htmlspecialchars($row['Funding']) ?></td>
                         <td>
-                            <a href='update_front.php?project_id=<?= $row['ProjectID']; ?>'>Update</a>
-                            <?php if ($_SESSION['role'] === 'Admin' && $row['Status'] !== 'Completed'): ?>
+                            <?php if ($_SESSION['role'] === 'Admin' || $_SESSION['role'] === 'Researcher'): ?>
+                                <a href='update_front.php?project_id=<?= $row['ProjectID']; ?>'>Update</a>
                                 <form action="" method="POST" style="display:inline;" onsubmit="return confirmDelete()">
                                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
                                     <input type="hidden" name="project_id" value="<?= $row['ProjectID']; ?>">
                                     <button type="submit" name="delete_project">Delete</button>
                                 </form>
+                            <?php else: ?>
+                                <p style='color: red;'>No Update/Delete Access</p>
                             <?php endif; ?>
                         </td>
                     </tr>
