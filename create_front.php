@@ -1,36 +1,5 @@
 <?php
-// Start the session
 session_start();
-session_regenerate_id(true);
-
-if (isset($_GET['success']) && $_GET['success'] == 'true') {
-    echo "<p style='color: green; text-align: center;'>Project created successfully!</p>";
-}
-
-// Redirect if the user is not logged in or has an incorrect role
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || !in_array($_SESSION['role'], ['Admin', 'Researcher'])) {
-    header("Location: login.php"); // Redirect to login if not logged in or role is not valid
-    exit();
-}
-
-// Generate CSRF token if it doesn't exist
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-// Database connection details
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "amc_data";
-
-// Create a connection to the MySQL database
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check for a connection error
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
 
 // Set a timeout duration
 $session_timeout = 300; // 5 minutes
@@ -39,384 +8,268 @@ $session_timeout = 300; // 5 minutes
 if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
     session_unset();
     session_destroy();
-    header("Location: login.php?timeout=true"); // / Redirect with timeout parameter
+    header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+    exit();
 }
-$_SESSION['LAST_ACTIVITY'] = time(); // Update last activity time
+$_SESSION['LAST_ACTIVITY'] = time();
 
-// Check if the form is submitted
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Validate CSRF token
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die("CSRF token validation failed. Possible security risk.");
-    }
+// Database connection
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "amc_data";
+$conn = new mysqli($servername, $username, $password, $dbname);
 
-    // Get form data
-    $project_name = filter_input(INPUT_POST, 'project_name', FILTER_SANITIZE_STRING);
-    $description = htmlspecialchars($_POST['description'], ENT_QUOTES, 'UTF-8');
-    $assigned_team = $_POST['assigned_team']; // Comma-separated list of user IDs
-    $funding = $_POST['funding'];
-    // Ensure funding is a valid number and greater than or equal to zero
-    if (!is_numeric($funding) || $funding < 0) {
-    echo "Invalid funding amount. Please enter a valid positive number.";
-    exit();
-    }
-    $start_date = $_POST['start_date'];
-    $created_by = $_SESSION['user_id'];
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
 
-    // Server-side validation
-    if (empty($project_name) || empty($description) || empty($assigned_team) || empty($funding) || empty($start_date)) {
-        echo "All fields are required!";
-        exit();
-    }
-
-// Insert the project into the Projects table with funding included
-$sql = "INSERT INTO Projects (ProjectName, Description, StartDate, CreatedBy, Funding) VALUES (?, ?, ?, ?, ?)";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("sssdi", $project_name, $description, $start_date, $created_by, $funding);
-
-if ($stmt->execute()) {
-    $project_id = $stmt->insert_id; // Get the last inserted project ID
-
-    // Assign team members to the project
-    $team_members = explode(',', $assigned_team); // Convert to an array
-
-    foreach ($team_members as $user_id) {
-        $user_id = trim($user_id);
-
-        // Check if UserID exists in Researchers table
-        $check_query = "SELECT COUNT(*) FROM Researchers WHERE UserID = ?";
-        $check_stmt = $conn->prepare($check_query);
-        $check_stmt->bind_param("i", $user_id);
-        $check_stmt->execute();
-        $check_stmt->bind_result($exists);
-        $check_stmt->fetch();
-        $check_stmt->close();
-
-        if ($exists == 0) {
-            // Add UserID to Researchers table
-            $user_query = "SELECT Username FROM Users WHERE UserID = ?";
-            $user_stmt = $conn->prepare($user_query);
-            $user_stmt->bind_param("i", $user_id);
-            $user_stmt->execute();
-            $user_stmt->bind_result($username);
-            $user_stmt->fetch();
-            $user_stmt->close();
-
-            // Generate a unique email address (placeholder if email doesn't exist)
-            $generated_email = strtolower($username) . "+generated" . $user_id . "@example.com";
-
-            $insert_query = "INSERT INTO Researchers (UserID, FullName, Email) VALUES (?, ?, ?)";
-            $insert_stmt = $conn->prepare($insert_query);
-            $insert_stmt->bind_param("iss", $user_id, $username, $generated_email);
-            if (!$insert_stmt->execute()) {
-                echo "Failed to add UserID $user_id to Researchers table: " . $insert_stmt->error;
-                exit();
-            }
-            $insert_stmt->close();
-        }
-
-        // Assign the researcher to the project
-        $assign_query = "INSERT INTO Researcher_Project (ResearcherID, ProjectID) VALUES ((SELECT ResearcherID FROM Researchers WHERE UserID = ?), ?)";
-        $assign_stmt = $conn->prepare($assign_query);
-        $assign_stmt->bind_param("ii", $user_id, $project_id);
-        if (!$assign_stmt->execute()) {
-            echo "Failed to assign UserID $user_id to ProjectID $project_id: " . $assign_stmt->error;
-            exit();
-        }
-        $assign_stmt->close();
-    }
-
-    // Redirect to project list page
-    header("Location: project_list.php?success=true");
-    exit();
-} else {
-    echo "Error: " . $stmt->error;
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
+    header("Location: login.php"); // Redirect to login if not logged in
     exit();
 }
 
+$log_in_user = $_SESSION['username']; // Assuming you store the username in session
+$log_in_role = $_SESSION['role']; // Admin, Researcher, etc.
+
+// Generate CSRF Token if not set
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Handle AJAX request for user search
-if (isset($_GET['q'])) {
-    $search_query = $_GET['q'];
-    $sql = "SELECT UserID, Username FROM Users WHERE Username LIKE ?"; // Remove the LIMIT clause
-    $stmt = $conn->prepare($sql);
-    $like_search = "%" . $search_query . "%";
-    $stmt->bind_param("s", $like_search);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $users = [];
-    while ($row = $result->fetch_assoc()) {
-        $users[] = $row;
-    }
-
-    echo json_encode($users); // Send all results
-    exit();
-}
-
-// Default: Get all users to display
-$sql = "SELECT UserID, Username FROM Users"; // No limit here
-$result = $conn->query($sql);
+// Fetch the first 7 users by default
 $initial_users = [];
-while ($row = $result->fetch_assoc()) {
+$user_query = $conn->query("SELECT UserID, Username FROM Users ORDER BY UserID ASC LIMIT 7");
+while ($row = $user_query->fetch_assoc()) {
     $initial_users[] = $row;
 }
 
+// Fetch existing projects
+$projects = [];
+$project_query = $conn->query("SELECT * FROM Projects ORDER BY StartDate DESC");
+while ($row = $project_query->fetch_assoc()) {
+    $projects[] = $row;
+}
+
+// Handle AJAX user search
+if (isset($_GET['q'])) {
+    $search_query = $conn->real_escape_string($_GET['q']);
+    $search_results = [];
+
+    $query = $conn->prepare("SELECT UserID, Username FROM Users WHERE Username LIKE CONCAT('%', ?, '%') ORDER BY UserID ASC");
+    $query->bind_param("s", $search_query);
+    $query->execute();
+    $result = $query->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $search_results[] = $row;
+    }
+    echo json_encode($search_results);
+    exit();
+}
+
+// Handle project creation
+if (isset($_POST['create_project'])) {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("CSRF token validation failed.");
+    }
+
+    $title = $conn->real_escape_string($_POST['title']);
+    $description = $conn->real_escape_string($_POST['description']);
+    $funding = floatval($_POST['funding']);
+    $startDate = $conn->real_escape_string($_POST['start_date']);
+    $endDate = !empty($_POST['end_date']) ? $conn->real_escape_string($_POST['end_date']) : NULL;
+    $status = 'Active';
+    $createdBy = $_SESSION['user_id'];
+
+    // Store team members
+    $team_members_raw = isset($_POST['assigned_team']) ? $_POST['assigned_team'] : "";
+    $team_members = explode(',', $team_members_raw);
+
+    $stmt = $conn->prepare("INSERT INTO Projects (ProjectName, Description, StartDate, EndDate, Status, CreatedBy, Funding) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssssid", $title, $description, $startDate, $endDate, $status, $createdBy, $funding);
+    $stmt->execute();
+    $project_id = $stmt->insert_id;
+
+    foreach ($team_members as $member) {
+        $member = trim($member);
+
+        // Validate ResearcherID exists
+        $check_stmt = $conn->prepare("SELECT ResearcherID FROM Researchers WHERE ResearcherID = ?");
+        $check_stmt->bind_param("i", $member);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+
+        if ($check_result->num_rows > 0) {
+            $stmt = $conn->prepare("INSERT INTO Researcher_Project (ProjectID, ResearcherID) VALUES (?, ?)");
+            $stmt->bind_param("ii", $project_id, $member);
+            $stmt->execute();
+        }
+    }
+
+    header("Location: create_front.php"); // Refresh project list after creation
+    exit();
+}
+
+// Handle project deletion
+if (isset($_POST['delete_project']) && isset($_POST['csrf_token'])) {
+    if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die("CSRF token validation failed.");
+    }
+
+    $project_id = intval($_POST['project_id']);
+
+    // Check project status
+    $check_status_stmt = $conn->prepare("SELECT Status FROM Projects WHERE ProjectID = ?");
+    $check_status_stmt->bind_param("i", $project_id);
+    $check_status_stmt->execute();
+    $status_result = $check_status_stmt->get_result();
+
+    if ($status_result->num_rows > 0) {
+        $status_row = $status_result->fetch_assoc();
+        if ($status_row['Status'] !== 'Completed') {
+            // Delete project
+            $delete_stmt = $conn->prepare("DELETE FROM Projects WHERE ProjectID = ?");
+            $delete_stmt->bind_param("i", $project_id);
+            $delete_stmt->execute();
+        }
+    }
+
+    header("Location: create_front.php"); // Refresh project list
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create New Research Project</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #fff;
-            color: #000;
-            margin: 0;
-            padding: 0;
-        }
-
-        h1 {
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        form {
-            width: 60%;
-            margin: 0 auto;
-            background-color: #f7f7f7;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        input[type="text"], input[type="date"], textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        input[type="submit"] {
-            background-color: #000;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        input[type="submit"]:hover {
-            background-color: #333;
-        }
-
-        .user-list {
-            margin-top: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            overflow-y: auto;
-            max-height: 200px;
-        }
-
-        .user-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .user-table th, .user-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .user-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        .user-table th {
-            background-color: #000;
-            color: white;
-        }
-
-        .assigned-users {
-            margin-top: 20px;
-        }
-
-        .assigned-users ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        .assigned-users li {
-            padding: 5px;
-        }
-
-        .assigned-users button {
-            margin-left: 10px;
-            background-color: red;
-            color: white;
-            border: none;
-            padding: 5px;
-            cursor: pointer;
-            border-radius: 3px;
-        }
-
-        .assigned-users button:hover {
-            background-color: #cc0000;
-        }
-    </style>
+    <title>Secure AMC Research Management System</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Create New Research Project</h1>
-    <form id="projectForm" action="create_front.php" method="POST">
-        <label for="project_name">Project Title:</label><br>
-        <input type="text" id="project_name" name="project_name" required><br><br>
-
-        <label for="description">Description:</label><br>
-        <textarea id="description" name="description" rows="4" cols="50" required></textarea><br><br>
-
-        <label for="assigned_team">Assigned Team Members:</label><br>
-        <input type="text" id="search" placeholder="Search for users..." onkeyup="searchUsers()"><br><br>
-        
-        <div id="search-results" class="user-list"></div>
-
-        <div class="assigned-users">
-            <h3>Selected Team Members:</h3>
-            <ul id="selected-users-list"></ul>
+    <header>
+        <h1>Secure AMC Research Management System</h1>
+        <div class="user-info">
+            <p>Logged in as: <strong><?= htmlspecialchars($log_in_user); ?></strong> (<?= htmlspecialchars($log_in_role); ?>)</p>
         </div>
+    </header>
 
-        <!-- CSRF Token --> 
-        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-        <input type="hidden" name="assigned_team" id="assigned_team">
 
-        <label for="funding">Funding:</label><br>
-        <input type="text" id="funding" name="funding" required><br><br>
+    <main>
+        <section id="add-research-projects">
+            <h2>Add Research Projects</h2>
+            <form action="" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
+                <input type="hidden" id="assigned_team" name="assigned_team">
 
-        <label for="start_date">Start Date:</label><br>
-        <input type="date" id="start_date" name="start_date" required><br><br>
+                <label for="title">Project Title:</label>
+                <input type="text" id="title" name="title" required>
 
-        <input type="submit" value="Create Project">
-    </form>
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="4" required></textarea>
+
+                <label for="funding">Funding:</label>
+                <input type="number" id="funding" name="funding" required>
+
+                <label for="start_date">Start Date:</label>
+                <input type="date" id="start_date" name="start_date" required>
+
+                <label for="end_date">End Date (optional):</label>
+                <input type="date" id="end_date" name="end_date">
+
+                <label for="search">Search Team Members:</label>
+                <input type="text" id="search" onkeyup="searchUsers()">
+                <div id="search-results"></div>
+
+                <h3>Assigned Team Members:</h3>
+                <ul id="selected-users-list"></ul>
+
+                <button type="submit" name="create_project">Create Project</button>
+            </form>
+        </section>
+
+        <section id="existing-projects">
+            <h3>Existing Projects</h3>
+            <table>
+                <tr>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Funding</th>
+                    <th>Actions</th>
+                </tr>
+                <?php foreach ($projects as $row): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['ProjectName']) ?></td>
+                        <td><?= htmlspecialchars($row['Description']) ?></td>
+                        <td><?= htmlspecialchars($row['StartDate']) ?></td>
+                        <td><?= htmlspecialchars($row['EndDate']) ?></td>
+                        <td><?= htmlspecialchars($row['Status']) ?></td>
+                        <td><?= htmlspecialchars($row['Funding']) ?></td>
+                        <td>
+                            <a href='update_front.php?project_id=<?= $row['ProjectID']; ?>'>Update</a>
+                            <?php if ($_SESSION['role'] === 'Admin' && $row['Status'] !== 'Completed'): ?>
+                                <form action="" method="POST" style="display:inline;" onsubmit="return confirmDelete()">
+                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
+                                    <input type="hidden" name="project_id" value="<?= $row['ProjectID']; ?>">
+                                    <button type="submit" name="delete_project">Delete</button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </table>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 AMC Corporation. All Rights Reserved. <a href="#contact">Contact Us</a></p>
+    </footer>
 
     <script>
-    let selectedUsers = [];
-    let debounceTimeout;
-
-    // Default users to display (first 7 users)
-    let users = <?php echo json_encode($initial_users); ?>;
-    displaySearchResults(users); // Display the first 7 users by default
-
-    // Debounced search function
-    function searchUsers() {
-        clearTimeout(debounceTimeout);  // Clear any previous debounce timeout
-        let searchQuery = document.getElementById('search').value.trim();
-
-        if (searchQuery.length >= 1) {  // Search starts after 1 character
-            debounceTimeout = setTimeout(function() {
-                let xhr = new XMLHttpRequest();
-                xhr.open('GET', 'create_front.php?q=' + searchQuery, true);  // AJAX request to fetch users
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState == 4 && xhr.status == 200) {
-                        let users = JSON.parse(xhr.responseText);
-                        displaySearchResults(users);
-                    }
-                };
-                xhr.send();
-            }, 300);  // 300ms debounce delay
-        } else {
-            // When the search is empty, display the first 7 users
-            displaySearchResults(<?php echo json_encode($initial_users); ?>);
-        }
-    }
-
-
-    // Display search results in a table
-    function displaySearchResults(users) {
-    let resultsContainer = document.getElementById('search-results');
-    resultsContainer.innerHTML = ''; // Clear previous results
-
-    if (users.length > 0) {
-        let table = document.createElement('table');
-        table.classList.add('user-table');
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Username</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        `;
-
-        let tbody = table.querySelector('tbody');
-
-        users.forEach(user => {
-            let row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${user.UserID}</td>
-                <td>${user.Username}</td>
-                <td><button type="button" onclick="addUserToAssigned(${user.UserID}, '${user.Username}')">Add</button></td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        resultsContainer.appendChild(table);
-    } else {
-        resultsContainer.innerHTML = '<p>No users found.</p>';
-        }
-    }
-
-    // Add user to assigned list
-    function addUserToAssigned(userID, username) {
-        if (selectedUsers.some(u => u.UserID === userID)) {
-            alert('User already added!');
-            return;
+        let selectedUsers = [];
+        function searchUsers() {
+            let searchQuery = document.getElementById('search').value.trim();
+            fetch('create_front.php?q=' + searchQuery)
+                .then(response => response.json())
+                .then(data => displaySearchResults(data));
         }
 
-        selectedUsers.push({ UserID: userID, Username: username });
-        updateAssignedUsersList();
-    }
-
-    // Update the list of selected users
-    function updateAssignedUsersList() {
-        let selectedList = document.getElementById('selected-users-list');
-        selectedList.innerHTML = '';
-        selectedUsers.forEach(user => {
-            let li = document.createElement('li');
-            li.innerHTML = `ID: ${user.UserID} | Username: ${user.Username} 
-                <button type="button" onclick="removeUser(${user.UserID})">Remove</button>`;
-            selectedList.appendChild(li);
-        });
-
-        // Update the hidden input with the selected user IDs
-        let userIds = selectedUsers.map(user => user.UserID);  // Array of User IDs
-        document.getElementById('assigned_team').value = userIds.join(',');  // Convert to comma-separated string
-    }
-
-    // Remove user from assigned list
-    function removeUser(userID) {
-        selectedUsers = selectedUsers.filter(user => user.UserID !== userID);
-        updateAssignedUsersList();
-    }
-
-    // Validate form before submission
-    function validateForm(event) {
-        if (selectedUsers.length === 0) {  // If no team member selected
-            event.preventDefault();  // Prevent form submission
-            alert('Please add at least one team member to the project.');
+        function displaySearchResults(users) {
+            let resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = users.map(user => `
+                <button type="button" onclick="addUser(event, ${user.UserID}, '${user.Username}')">${user.Username}</button>
+            `).join('');
         }
-    }
 
-    // Bind the validation function to the form's submit event
-    document.querySelector('form').addEventListener('submit', validateForm);
+        function addUser(event, userID, username) {
+            event.preventDefault(); // Prevents page refresh
+            if (!selectedUsers.some(u => u.UserID === userID)) {
+                selectedUsers.push({ UserID: userID, Username: username });
+                document.getElementById('assigned_team').value = selectedUsers.map(user => user.UserID).join(',');
+                updateUserList();
+            }
+        }
 
-</script>
+        function updateUserList() {
+            let list = document.getElementById('selected-users-list');
+            list.innerHTML = selectedUsers.map(user => `
+                <li>${user.Username} <button onclick="removeUser(${user.UserID})">Remove</button></li>
+            `).join('');
+        }
 
+        function removeUser(userID) {
+            selectedUsers = selectedUsers.filter(user => user.UserID !== userID);
+            updateUserList();
+        }
+
+        function confirmDelete() {
+            return confirm("Are you sure you want to delete this project? This action cannot be reversed.");
+        }
+    </script>
 </body>
 </html>
-
