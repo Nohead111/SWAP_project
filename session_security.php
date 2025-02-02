@@ -1,6 +1,5 @@
 <?php
 
-session_start();
 
 // Function to forcibly end the session
 function end_session() {

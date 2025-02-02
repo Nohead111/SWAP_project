@@ -4,7 +4,7 @@ require "config.php"; // Include database connection
 
 // Check if the user is already logged in
 if (isset($_SESSION["user_id"])) {
-    header("Location: equipment_inventory.php");
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -69,9 +69,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Redirect user based on role
                 if ($user["RoleID"] == 1) {
-                    header("Location: equipment_inventory.php");
+                    header("Location: dashboard.php");
                 } else {
-                    header("Location: equipment_inventory.php");
+                    header("Location: dashboard.php");
                 }
                 exit();
             } else {

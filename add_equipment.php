@@ -5,23 +5,48 @@ if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit();
 }
+
+$session_timeout = 300; // 5 minutes
+
+// Check if the session has timed out
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+        exit();
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
+
+if ($_SESSION["user_role"] == 2 ) {
+    echo "<script>alert('Access Denied: Only Admins and Research Assistants can add equipment!'); window.location.href='equipment_inventory.php';</script>";
+    exit();
+}
 $createdBy = $_SESSION['user_name'];
 
 // Check if form is submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     // Retrieve and sanitize input values
-    $name = trim($_POST['name']);
-    $description = trim($_POST['description']);
-    $serialNumber = trim($_POST['serialNumber']);
-    $status = trim($_POST['status']);
-    $purchaseDate = trim($_POST['purchaseDate']);
-    $lastServicedDate = trim($_POST['lastServicedDate']);
+    $name = htmlspecialchars(trim($_POST['name']));
+    $description = htmlspecialchars(trim($_POST['description']));
+    $serialNumber = htmlspecialchars(trim($_POST['serialNumber']));
+    $status = htmlspecialchars(trim($_POST['status']));
+    $purchaseDate = htmlspecialchars(trim($_POST['purchaseDate']));
+    $lastServicedDate = htmlspecialchars(trim($_POST['lastServicedDate']));
 
+    
     // Validate required fields
     if (empty($name) || empty($serialNumber) || empty($status)) {
         echo "<script>alert('Error: Name, Serial Number, and Status are required fields!'); window.history.back();</script>";
         exit;
+    }
+    if (!preg_match("/^[a-zA-Z0-9\s\-]+$/", $name)) {
+        echo "<script>alert('Error: Invalid equipment name!'); window.history.back();</script>";
+        exit();
+    }
+    if (!preg_match("/^[a-zA-Z0-9\-]+$/", $serialNumber)) {
+        echo "<script>alert('Error: Invalid serial number!'); window.history.back();</script>";
+        exit();
     }
 
     // Check for duplicate serial number
@@ -69,6 +94,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit;
     }
     $stmt->close();
+
 
     // Insert into database using prepared statement
     $insertQuery = "INSERT INTO equipment (Name, Description, SerialNumber, Status, PurchaseDate, LastServicedDate, CreatedBy) 

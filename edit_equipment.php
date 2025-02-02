@@ -1,9 +1,30 @@
 <?php
 require "config.php"; // Include database connection
+session_start();
+if (!isset($_SESSION["user_id"])) {
+    header("Location: login.php");
+    exit();
+}
+
+$session_timeout = 300; // 5 minutes
+
+// Check if the session has timed out
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+        exit();
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
 
 // Check if an EquipmentID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     die("Invalid request. No Equipment ID provided.");
+}
+
+if ($_SESSION["user_role"] == 2 ) {
+    echo "<script>alert('Access Denied: Only Admins and Research Assistants can edit equipment!'); window.location.href='equipment_inventory.php';</script>";
+    exit();
 }
 
 $equipmentID = intval($_GET['id']); // Ensure ID is an integer
@@ -56,12 +77,28 @@ $stmt->close();
 
 // Handle form submission for updating equipment
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $name = $_POST['name'];
-    $description = $_POST['description'];
-    $serialNumber = $_POST['serialNumber'];
-    $status = $_POST['status'];
-    $purchaseDate = $_POST['purchaseDate'];
-    $lastServicedDate = $_POST['lastServicedDate'];
+    $name = htmlspecialchars(trim($_POST['name']));
+    $description = htmlspecialchars(trim($_POST['description']));
+    $serialNumber = htmlspecialchars(trim($_POST['serialNumber']));
+    $status = htmlspecialchars(trim($_POST['status']));
+    $purchaseDate = htmlspecialchars(trim($_POST['purchaseDate']));
+    $lastServicedDate = htmlspecialchars(trim($_POST['lastServicedDate']));
+
+    //  Validate Required Fields
+    if (empty($name) || empty($serialNumber) || empty($status)) {
+        echo "<script>alert('Error: Name, Serial Number, and Status are required!'); window.history.back();</script>";
+        exit();
+    }
+
+     //  Validate Inputs (Prevent SQL Injection & XSS)
+     if (!preg_match("/^[a-zA-Z0-9\s\-]+$/", $name)) {
+        echo "<script>alert('Error: Invalid equipment name!'); window.history.back();</script>";
+        exit();
+    }
+    if (!preg_match("/^[a-zA-Z0-9\-]+$/", $serialNumber)) {
+        echo "<script>alert('Error: Invalid serial number!'); window.history.back();</script>";
+        exit();
+    }
 
     // Update query with prepared statements
     $updateQuery = "UPDATE equipment 
@@ -90,16 +127,19 @@ $con->close();
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    
+
     <!-- Header -->
     <header>
-        <h1>Edit Equipment</h1>
+        <h1>AMC Research Management System</h1>
+        <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
     <!-- Navigation -->
     <nav>
-        <a href="index.html">Dashboard</a>
-        <a href="projects.html">Projects</a>
-        <a href="researchers.html">Researchers</a>
+        <a href="dashboard.php">Dashboard</a>
+        <a href="projects.php">Projects</a>
+        <a href="researcher_profile.php">Researchers</a>
         <a href="equipment_inventory.php" class="active">Equipment Inventory</a>
     </nav>
 

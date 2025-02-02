@@ -1,6 +1,20 @@
 <?php
 require "config.php"; // Include database connection
+session_start();
+if (!isset($_SESSION["user_id"])) {
+    header("Location: login.php");
+    exit();
+}
+$session_timeout = 300; // 5 minutes
 
+// Check if the session has timed out
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+        exit();
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
 // Check if an EquipmentID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     die("Invalid request. No Equipment ID provided.");

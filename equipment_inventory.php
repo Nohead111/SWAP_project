@@ -4,6 +4,17 @@ if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit();
 }
+$session_timeout = 300; // 5 minutes
+
+// Check if the session has timed out
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $session_timeout) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=true"); // Redirect with timeout parameter
+        exit();
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
+    
 $createdBy = $_SESSION['user_name'];
 
 $user_role = $_SESSION["user_role"]; // Get logged-in user's role
@@ -89,15 +100,15 @@ function get_equipment(){
 <body>
     <!-- Header -->
     <header>
-        <h1>Equipment Inventory</h1>
+        <h1>AMC Research Management System</h1>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
 
     <!-- Navigation -->
     <nav>
-        <a href="index.html">Dashboard</a>
-        <a href="projects.html">Projects</a>
-        <a href="researchers.html">Researchers</a>
+        <a href="dashboard.php">Dashboard</a>
+        <a href="projects.php">Projects</a>
+        <a href="researcher_profile.php">Researchers</a>
         <a href="equipment_inventory.php" class="active">Equipment Inventory</a>
     </nav>
 
