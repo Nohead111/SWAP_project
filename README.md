@@ -5,3 +5,14 @@
 5. In vscode select the folder C:\git\SWAP_project and put all your source code in the folder. save after all the folders is in. 
 6. after putting in the source code in the folder, you should see the folders and files in github desktop. If everythings correct, at the bottom left, click commit to main.
 7. you should see all the folders you pasted in the github. 
+
+
+
+admin - 2031409E@student.tp.edu.sg
+pass- nohead
+
+researcher- Researcher@gmail.com
+pass -nohead 
+
+researcher assistant - Assistant@gmail.com
+pass- nohead
